@@ -11,7 +11,7 @@ on:
 
 permissions:
    #表示该 Action 具有读取仓库内容的权限。
-  contents: write|read
+  contents: write
 
 jobs:
   build:
