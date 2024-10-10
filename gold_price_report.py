@@ -25,6 +25,7 @@ def get_gold_price():
     return gold_price.text
 def send_gold_price(access_token, gold_price):
     today = datetime.date.today()
+    # yesterday = today - datetime.timedelta(days=1)
     today_str = today.strftime("%Y年%m月%d日")
 
     body = {
@@ -45,10 +46,17 @@ def send_gold_price(access_token, gold_price):
 
 def data_to_csv(gold_price):
     header = ['date', 'gold_price']
-    file_path = 'output.csv'
+    file_path = 'gold_price_result.csv'
     # 检查文件是否存在以及是否为空
     file_exists = os.path.isfile(file_path)
     file_empty = file_exists and os.path.getsize(file_path) == 0
+
+    exists_date=set()
+    if file_exists:
+        with open(file_path, mode='r', newline='', encoding='utf-8') as file:
+            reader = csv.reader(file)
+            next(reader)  # 跳过表头
+            exists_date = {row[0] for row in reader}  # 假设日期是索引列，位于第一列
 
     today = datetime.date.today()
     today_str = today.strftime("%Y年%m月%d日")
@@ -61,9 +69,14 @@ def data_to_csv(gold_price):
         # 如果文件不存在或为空，则写入表头
         if not file_exists or file_empty:
             writer.writerow(header)
-
         # 写入数据行
-        writer.writerows(data)
+        for row in data:
+            if row[0] not in exists_date:
+                writer.writerows(data)
+
+
+
+
 
 if __name__ == '__main__':
     # 从测试号信息获取
@@ -73,7 +86,14 @@ if __name__ == '__main__':
     openId = os.environ.get("OPEN_ID")
     # 天气预报模板ID
     gold_template_id = os.environ.get("GOLD_TEMPLATE_ID")
-    
+
+    # appID = 'wxd6a43a6150559f99'
+    # appSecret = 'a3e7238cda0f6f774662c167a8220b87'
+    # # 收信人ID即 用户列表中的微信号
+    # openId = 'onF0w668aLuGK2i_w6ifDnnL9gDM'
+    # # 天气预报模板ID
+    # gold_template_id = 'U2qKAtRU1HNn0EljQtpsM0_q7WUSk8Wp7Gwyzrj4ixg'
+
 
     gold_price=get_gold_price()
     data_to_csv(gold_price)
