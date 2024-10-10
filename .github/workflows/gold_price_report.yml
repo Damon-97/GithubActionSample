@@ -20,15 +20,20 @@ jobs:
     env:
       TZ: Asia/Shanghai
     steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.12"
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Run gold_price Report
+    - name: Run weather Report
       run: |
         python gold_price_report.py
       env:
         APP_ID: ${{ secrets.APP_ID }}
         APP_SECRET: ${{ secrets.APP_SECRET }}
         OPEN_ID: ${{ secrets.OPEN_ID }}
-        TEMPLATE_ID: ${{ secrets.GOLD_TEMPLATE_ID }}
+        GOLD_TEMPLATE_ID: ${{ secrets.GOLD_TEMPLATE_ID }}
