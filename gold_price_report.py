@@ -87,12 +87,6 @@ if __name__ == '__main__':
     # 天气预报模板ID
     gold_template_id = os.environ.get("GOLD_TEMPLATE_ID")
 
-    # appID = 'wxd6a43a6150559f99'
-    # appSecret = 'a3e7238cda0f6f774662c167a8220b87'
-    # # 收信人ID即 用户列表中的微信号
-    # openId = 'onF0w668aLuGK2i_w6ifDnnL9gDM'
-    # # 天气预报模板ID
-    # gold_template_id = 'U2qKAtRU1HNn0EljQtpsM0_q7WUSk8Wp7Gwyzrj4ixg'
 
 
     gold_price=get_gold_price()
