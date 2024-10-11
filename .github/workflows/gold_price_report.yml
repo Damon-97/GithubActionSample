@@ -41,6 +41,9 @@ jobs:
         APP_SECRET: ${{ secrets.APP_SECRET }}
         OPEN_ID: ${{ secrets.OPEN_ID }}
         GOLD_TEMPLATE_ID: ${{ secrets.GOLD_TEMPLATE_ID }}
+    - name: Pull changes from remote
+      run: git pull origin main --rebase || echo "处理冲突或其他问题"
+
     - name: commit_result
       run: |
         git config --local user.name Damon-97
