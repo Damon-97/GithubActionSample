@@ -32,14 +32,4 @@ jobs:
         APP_SECRET: ${{ secrets.APP_SECRET }}
         OPEN_ID: ${{ secrets.OPEN_ID }}
         GOLD_TEMPLATE_ID: ${{ secrets.GOLD_TEMPLATE_ID }}
-    - name: Configure git
-      run: |
-        git config --local user.name Damon-97
-        git config --local user.email 2523996755@qq.com
-    - name: Pull changes from remote with rebase
-      run: git pull --rebase origin main
-    - name: Commit and push results
-      run: |
-        git add gold_price_result.csv
-        git diff --staged --quiet || git commit -m "更新结果数据"
-        git push origin main
+  
