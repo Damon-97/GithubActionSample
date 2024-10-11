@@ -35,6 +35,11 @@ jobs:
       run: |
         git config --local user.name Damon-97
         git config --local user.email 2523996755@qq.com
+    - name: Commit changes if any
+      run: |
+        git add gold_price_result.csv
+        git diff --staged --quiet || git commit -m "更新结果数据"
+
     - name: Pull changes from remote with rebase
       run: git pull --rebase origin main
     - name: Commit and push results
