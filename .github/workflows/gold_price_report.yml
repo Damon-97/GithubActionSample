@@ -1,21 +1,15 @@
-# This workflow will install Python dependencies, run tests and lint with a single version of Python
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
-
 name: 水贝金价推送
 
 on:
   schedule:
-    # 设置启动时间，为 UTC 时间, UTC 03点 对应北京时间早11点
-    - cron : '00 03 * * *'
+    - cron: '00 03 * * *'  # UTC时间03点，北京时间11点
   workflow_dispatch:
 
 permissions:
-   #表示该 Action 具有写入仓库内容的权限。
   contents: write
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     env:
       TZ: Asia/Shanghai
@@ -29,26 +23,23 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Run weather Report
+    - name: Run gold price report
       run: |
         python gold_price_report.py
-        echo "执行操作并生成结果数据" > gold_price_result.csv  # 生成结果数据
+        echo "执行操作并生成结果数据" > gold_price_result.csv
       env:
         APP_ID: ${{ secrets.APP_ID }}
         APP_SECRET: ${{ secrets.APP_SECRET }}
         OPEN_ID: ${{ secrets.OPEN_ID }}
         GOLD_TEMPLATE_ID: ${{ secrets.GOLD_TEMPLATE_ID }}
-    - name: Pull changes from remote
+    - name: Configure git
       run: |
         git config --local user.name Damon-97
         git config --local user.email 2523996755@qq.com
-        git pull origin main --rebase || echo "处理冲突或其他问题"
+    - name: Pull changes from remote with rebase
+      run: git pull --rebase origin main
     - name: Commit and push results
       run: |
         git add gold_price_result.csv
         git diff --staged --quiet || git commit -m "更新结果数据"
-        git push origin main || echo "推送失败，可能需要手动解决"
-      
-      
-      
-       
+        git push origin main
