@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-   #表示该 Action 具有读取仓库内容的权限。
+   #表示该 Action 具有写入仓库内容的权限。
   contents: write
 
 jobs:
@@ -32,13 +32,13 @@ jobs:
     - name: Run weather Report
       run: |
         python gold_price_report.py
-    - name: commit_result
-      run: |
-        git config --local user.name "github-actions"
-        git config --local user.email "github-actions@github.com"
-        git add gold_price_result.csv  # 添加生成的文件
-        git commit -m "更新结果数据" || echo "没有更改需要提交"  # 提交更改
-        git push  # 推送到仓库
+    # - name: commit_result
+    #   run: |
+    #     git config --local user.name Damon-97
+    #     git config --local user.email 2523996755@qq.com
+    #     git add gold_price_result.csv  # 添加生成的文件
+    #     git commit -m "更新结果数据" || echo "没有更改需要提交"  # 提交更改
+    #     git push  # 推送到仓库
       
       env:
         APP_ID: ${{ secrets.APP_ID }}
