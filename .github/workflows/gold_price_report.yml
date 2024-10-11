@@ -32,6 +32,7 @@ jobs:
     - name: Run weather Report
       run: |
         python gold_price_report.py
+        echo "执行操作并生成结果数据" > gold_price_result.csv  # 生成结果数据
       env:
         APP_ID: ${{ secrets.APP_ID }}
         APP_SECRET: ${{ secrets.APP_SECRET }}
