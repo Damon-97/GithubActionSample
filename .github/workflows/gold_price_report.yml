@@ -26,7 +26,6 @@ jobs:
     - name: Run gold price report
       run: |
         python gold_price_report.py
-        echo "执行操作并生成结果数据" > gold_price_result.csv
       env:
         APP_ID: ${{ secrets.APP_ID }}
         APP_SECRET: ${{ secrets.APP_SECRET }}
