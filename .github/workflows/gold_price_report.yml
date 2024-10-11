@@ -8,6 +8,9 @@ on:
     # 设置启动时间，为 UTC 时间, UTC 03点 对应北京时间早11点
     - cron : '00 03 * * *'
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
    #表示该 Action 具有写入仓库内容的权限。
