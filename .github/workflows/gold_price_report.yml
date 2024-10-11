@@ -42,19 +42,15 @@ jobs:
         OPEN_ID: ${{ secrets.OPEN_ID }}
         GOLD_TEMPLATE_ID: ${{ secrets.GOLD_TEMPLATE_ID }}
     - name: Pull changes from remote
-      run: git pull origin main --rebase || echo "处理冲突或其他问题"
-
-    - name: commit_result
       run: |
         git config --local user.name Damon-97
         git config --local user.email 2523996755@qq.com
-        git fetch origin main
-        git rebase origin/main || echo "处理冲突或其他问题"
-        
-        git add gold_price_result.csv  # 添加生成的文件
+        git pull origin main --rebase || echo "处理冲突或其他问题"
+    - name: Commit and push results
+      run: |
+        git add gold_price_result.csv
         git diff --staged --quiet || git commit -m "更新结果数据"
         git push origin main || echo "推送失败，可能需要手动解决"
-      
       
       
       
