@@ -94,7 +94,7 @@ if __name__ == '__main__':
     access_token = get_access_token()
     send_gold_price(access_token, gold_price)
 
-    openId="onF0w63Obf2kKed73JFd4vOC4gec"
+    openId="onF0w6z7Xu-tnbd7vCfaDUqmgK1A"
     access_token = get_access_token()
     send_gold_price(access_token, gold_price)
     
