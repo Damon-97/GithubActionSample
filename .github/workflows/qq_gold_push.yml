@@ -40,7 +40,7 @@ jobs:
         QQ_GROUP_OPENID: ${{ secrets.QQ_GROUP_OPENID }}
     - name: Capture QQ group openid
       if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'capture' }}
-      run: python qq_gold_push.py --capture --timeout 180
+        run: python qq_gold_push.py --capture --timeout 600
       env:
         QQ_APP_ID: ${{ secrets.QQ_APP_ID }}
         QQ_APP_SECRET: ${{ secrets.QQ_APP_SECRET }}
