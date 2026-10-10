@@ -28,35 +28,42 @@ def get_access_token():
     return access_token
 
 
-def get_gold_price():
-    """读取首页实时金价曲线的最新一个点。"""
-    url = "https://cngoldprice.com/"
-    headers = {"User-Agent": "Mozilla/5.0 (compatible; GithubActionSample/1.0)"}
-    response = requests.get(url=url, headers=headers, timeout=30)
+def fetch_page():
+    response = requests.get(
+        "https://cngoldprice.com/",
+        headers={"User-Agent": "Mozilla/5.0 (compatible; GithubActionSample/1.0)"},
+        timeout=30,
+    )
     response.raise_for_status()
-    matches = list(re.finditer(
-        r'timestamp\\?":(\d+),\\?"price\\?":(\d+(?:\.\d+)?)',
-        response.text,
-    ))
-    if not matches:
-        raise RuntimeError("页面上找不到实时金价曲线数据，站点结构可能已变化")
+    return response.text
 
-    series = [matches[0]]
-    for previous, current in zip(matches, matches[1:]):
-        if current.start() - previous.end() > 20:
-            break
-        series.append(current)
 
-    timestamp, price = max(
-        ((int(item.group(1)), item.group(2)) for item in series),
-        key=lambda item: item[0],
+def get_shuibei_price(html):
+    """水贝市场批发售价，取水贝国际这一行。"""
+    match = re.search(
+        r"水贝国际</td>\s*<td[^>]*>\s*(\d+(?:\.\d+)?)\s*</td>",
+        html,
     )
-    shown = f"{float(price):.2f}"
-    point_time = datetime.datetime.fromtimestamp(
-        timestamp / 1000, datetime.timezone(datetime.timedelta(hours=8))
+    if not match:
+        raise RuntimeError("页面上找不到水贝金价，站点结构可能已变化")
+    return match.group(1)
+
+
+def get_international_price(html):
+    """国际金价，取「国际金价(伦敦金)」里伦敦金的最新价。"""
+    match = re.search(
+        r'伦敦金\\".*?children\\":(\d+(?:\.\d+)?)',
+        html,
     )
-    print("chart latest:", point_time.strftime("%Y-%m-%d %H:%M"), shown)
-    return shown
+    if not match:
+        raise RuntimeError("页面上找不到国际金价，站点结构可能已变化")
+    return match.group(1)
+
+
+def format_gold_message(shuibei_price, international_price):
+    return "水贝金价{}元/克，国际金价{}（伦敦金）".format(shuibei_price, international_price)
+
+
 def send_gold_price(access_token, gold_price):
     today = datetime.date.today()
     # yesterday = today - datetime.timedelta(days=1)
@@ -81,8 +88,8 @@ def send_gold_price(access_token, gold_price):
     if result.get("errcode") not in (0, None):
         raise RuntimeError("微信模板消息发送失败: {}".format(result.get("errmsg")))
 
-def data_to_csv(gold_price):
-    header = ['date', 'gold_price']
+def data_to_csv(shuibei_price, international_price):
+    header = ['date', 'gold_price', 'international_gold_price']
     file_path = 'gold_price_result.csv'
     today_str = datetime.date.today().strftime("%Y年%m月%d日")
 
@@ -92,15 +99,24 @@ def data_to_csv(gold_price):
             rows = list(csv.reader(file))
     if not rows:
         rows = [header]
+    elif rows[0] and rows[0][0] == 'date':
+        rows[0] = header
 
     updated = False
     for row in rows[1:]:
         if row and row[0] == today_str:
-            row[1] = gold_price
+            if len(row) < 2:
+                row.append(shuibei_price)
+            else:
+                row[1] = shuibei_price
+            if len(row) < 3:
+                row.append(international_price)
+            else:
+                row[2] = international_price
             updated = True
             break
     if not updated:
-        rows.append([today_str, gold_price])
+        rows.append([today_str, shuibei_price, international_price])
 
     with open(file_path, mode='w', newline='', encoding='utf-8') as file:
         csv.writer(file).writerows(rows)
@@ -120,8 +136,12 @@ if __name__ == '__main__':
 
 
 
-    gold_price=get_gold_price()
-    data_to_csv(gold_price)
+    page = fetch_page()
+    shuibei_price = get_shuibei_price(page)
+    international_price = get_international_price(page)
+    gold_price = format_gold_message(shuibei_price, international_price)
+    print(gold_price)
+    data_to_csv(shuibei_price, international_price)
     access_token = get_access_token()
     send_gold_price(access_token, gold_price)
 
