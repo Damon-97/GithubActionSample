@@ -94,7 +94,10 @@ def send_gold_price(access_token, gold_price):
         }
     }
     url = 'https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={}'.format(access_token)
-    print(requests.post(url, json.dumps(body)).text)
+    result = requests.post(url, json=body, timeout=30).json()
+    print("wechat send: errcode={} errmsg={}".format(result.get("errcode"), result.get("errmsg")))
+    if result.get("errcode") not in (0, None):
+        raise RuntimeError("微信模板消息发送失败: {}".format(result.get("errmsg")))
 
 def data_to_csv(gold_price):
     header = ['date', 'gold_price']
