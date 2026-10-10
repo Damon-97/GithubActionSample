@@ -1,0 +1,46 @@
+name: QQ金价推送
+
+on:
+  schedule:
+    - cron: '00 03 * * *'  # UTC 03:00，北京时间 11:00
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: send 推送金价，capture 等待群里 @ 机器人并打印 group_openid
+        type: choice
+        default: send
+        options:
+          - send
+          - capture
+
+permissions:
+  contents: read
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Shanghai
+    steps:
+    - uses: actions/checkout@v5
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.12"
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    - name: Push gold price to QQ
+      if: ${{ github.event_name != 'workflow_dispatch' || inputs.mode == 'send' }}
+      run: python qq_gold_push.py
+      env:
+        QQ_APP_ID: ${{ secrets.QQ_APP_ID }}
+        QQ_APP_SECRET: ${{ secrets.QQ_APP_SECRET }}
+        QQ_GROUP_OPENID: ${{ secrets.QQ_GROUP_OPENID }}
+    - name: Capture QQ group openid
+      if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'capture' }}
+      run: python qq_gold_push.py --capture --timeout 180
+      env:
+        QQ_APP_ID: ${{ secrets.QQ_APP_ID }}
+        QQ_APP_SECRET: ${{ secrets.QQ_APP_SECRET }}
