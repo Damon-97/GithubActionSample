@@ -50,18 +50,34 @@ def get_shuibei_price(html):
 
 
 def get_international_price(html):
-    """国际金价，取「国际金价(伦敦金)」里伦敦金的最新价。"""
-    match = re.search(
-        r'伦敦金\\".*?children\\":(\d+(?:\.\d+)?)',
+    """国际金价按人民币，取首页实时曲线的最新一个点。"""
+    matches = list(re.finditer(
+        r'timestamp\\?":(\d+),\\?"price\\?":(\d+(?:\.\d+)?)',
         html,
+    ))
+    if not matches:
+        raise RuntimeError("页面上找不到国际金价曲线，站点结构可能已变化")
+
+    series = [matches[0]]
+    for previous, current in zip(matches, matches[1:]):
+        if current.start() - previous.end() > 20:
+            break
+        series.append(current)
+
+    timestamp, price = max(
+        ((int(item.group(1)), item.group(2)) for item in series),
+        key=lambda item: item[0],
     )
-    if not match:
-        raise RuntimeError("页面上找不到国际金价，站点结构可能已变化")
-    return match.group(1)
+    shown = f"{float(price):.2f}"
+    point_time = datetime.datetime.fromtimestamp(
+        timestamp / 1000, datetime.timezone(datetime.timedelta(hours=8))
+    )
+    print("international curve:", point_time.strftime("%Y-%m-%d %H:%M"), shown)
+    return shown
 
 
 def format_gold_message(shuibei_price, international_price):
-    return "水贝金价{}元/克，国际金价{}（伦敦金）".format(shuibei_price, international_price)
+    return "水贝金价{}元/克，国际金价{}元/克".format(shuibei_price, international_price)
 
 
 def send_gold_price(access_token, gold_price):
