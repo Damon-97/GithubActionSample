@@ -3,7 +3,6 @@ import os
 import re
 import requests
 import datetime
-from bs4 import BeautifulSoup
 
 
 def require_env(name):
@@ -29,52 +28,35 @@ def get_access_token():
     return access_token
 
 
-def _sell_price(text):
-    text = text.replace(",", "").strip()
-    if re.fullmatch(r"\d+(?:\.\d+)?", text):
-        return text
-    return None
-
-
 def get_gold_price():
-    """读取水贝市场批发售价。页面改版后不再使用旧的大号价格节点。"""
+    """读取首页实时金价曲线的最新一个点。"""
     url = "https://cngoldprice.com/"
     headers = {"User-Agent": "Mozilla/5.0 (compatible; GithubActionSample/1.0)"}
     response = requests.get(url=url, headers=headers, timeout=30)
     response.raise_for_status()
-    soup = BeautifulSoup(response.text, "html.parser")
+    matches = list(re.finditer(
+        r'timestamp\\?":(\d+),\\?"price\\?":(\d+(?:\.\d+)?)',
+        response.text,
+    ))
+    if not matches:
+        raise RuntimeError("页面上找不到实时金价曲线数据，站点结构可能已变化")
 
-    heading = soup.find(id="shuibei-mkt")
-    table = None
-    if heading is not None:
-        section = heading.find_parent("section")
-        if section is not None:
-            table = section.find("table")
-    if table is None:
-        for candidate in soup.find_all("table"):
-            if "水贝" in candidate.get_text():
-                table = candidate
-                break
-    if table is None:
-        raise RuntimeError("页面上找不到水贝市场报价表，站点结构可能已变化")
+    series = [matches[0]]
+    for previous, current in zip(matches, matches[1:]):
+        if current.start() - previous.end() > 20:
+            break
+        series.append(current)
 
-    body = table.find("tbody")
-    rows = body.find_all("tr") if body else table.find_all("tr")[1:]
-    quotes = []
-    for row in rows:
-        cells = [cell.get_text(strip=True) for cell in row.find_all("td")]
-        if len(cells) < 2:
-            continue
-        sell = _sell_price(cells[1])
-        if sell is not None:
-            quotes.append((cells[0], sell))
-    if not quotes:
-        raise RuntimeError("水贝报价表里没有可用售价")
-
-    chosen = next((price for name, price in quotes if name == "水贝国际"), quotes[0][1])
-    print("shuibei quotes:", ", ".join(f"{name}={price}" for name, price in quotes))
-    print("gold_price:", chosen)
-    return chosen
+    timestamp, price = max(
+        ((int(item.group(1)), item.group(2)) for item in series),
+        key=lambda item: item[0],
+    )
+    shown = f"{float(price):.2f}"
+    point_time = datetime.datetime.fromtimestamp(
+        timestamp / 1000, datetime.timezone(datetime.timedelta(hours=8))
+    )
+    print("chart latest:", point_time.strftime("%Y-%m-%d %H:%M"), shown)
+    return shown
 def send_gold_price(access_token, gold_price):
     today = datetime.date.today()
     # yesterday = today - datetime.timedelta(days=1)
@@ -102,32 +84,26 @@ def send_gold_price(access_token, gold_price):
 def data_to_csv(gold_price):
     header = ['date', 'gold_price']
     file_path = 'gold_price_result.csv'
-    # 检查文件是否存在以及是否为空
-    file_exists = os.path.isfile(file_path)
-    file_empty = file_exists and os.path.getsize(file_path) == 0
+    today_str = datetime.date.today().strftime("%Y年%m月%d日")
 
-    exists_date=set()
-    if file_exists:
+    rows = []
+    if os.path.isfile(file_path) and os.path.getsize(file_path) > 0:
         with open(file_path, mode='r', newline='', encoding='utf-8') as file:
-            reader = csv.reader(file)
-            next(reader)  # 跳过表头
-            exists_date = {row[0] for row in reader}  # 假设日期是索引列，位于第一列
+            rows = list(csv.reader(file))
+    if not rows:
+        rows = [header]
 
-    today = datetime.date.today()
-    today_str = today.strftime("%Y年%m月%d日")
-    gold_price = gold_price
-    data = [[today_str, gold_price]]
+    updated = False
+    for row in rows[1:]:
+        if row and row[0] == today_str:
+            row[1] = gold_price
+            updated = True
+            break
+    if not updated:
+        rows.append([today_str, gold_price])
 
-    # 写入 CSV 文件
-    with open(file_path, mode='a', newline='', encoding='utf-8') as file:
-        writer = csv.writer(file)
-        # 如果文件不存在或为空，则写入表头
-        if not file_exists or file_empty:
-            writer.writerow(header)
-        # 写入数据行
-        for row in data:
-            if row[0] not in exists_date:
-                writer.writerow(row)
+    with open(file_path, mode='w', newline='', encoding='utf-8') as file:
+        csv.writer(file).writerows(rows)
 
 
 
