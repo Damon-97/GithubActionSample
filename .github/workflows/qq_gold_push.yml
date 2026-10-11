@@ -2,7 +2,7 @@ name: QQ金价推送
 
 on:
   schedule:
-    - cron: '00 03 * * *'  # UTC 03:00，北京时间 11:00
+    - cron: '15 03 * * *'  # UTC 03:15，北京时间 11:15。避开整点，降低被 GitHub 丢弃的概率
   workflow_dispatch:
     inputs:
       mode:
