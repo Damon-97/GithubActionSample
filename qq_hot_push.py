@@ -43,14 +43,9 @@ def build_message(data, page_url):
         lines.append(page_url)
     topics = data.get("topics") or []
     if topics:
-        lines.extend(["", "跨平台"])
+        lines.extend(["", "多平台热搜"])
         for idx, topic in enumerate(topics[:8], start=1):
-            where = "、".join(
-                "{}#{}".format(m.get("label") or m.get("platform") or "", m.get("rank") or "-")
-                for m in (topic.get("mentions") or [])[:4]
-            )
-            suffix = "（{}）".format(where) if where else ""
-            lines.append("{}. {}{}".format(idx, clip(topic.get("title")), suffix))
+            lines.append("{}. {}".format(idx, clip(topic.get("title"))))
     shown = 0
     for sid, board in (data.get("boards") or {}).items():
         if board.get("kind") != "board" or sid == "hackernews":
