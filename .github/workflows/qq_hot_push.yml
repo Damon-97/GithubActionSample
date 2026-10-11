@@ -1,0 +1,33 @@
+name: QQ全网热榜推送
+
+on:
+  schedule:
+    - cron: "20 0,4,12 * * *" # 热榜页在整点更新，晚 20 分钟再推到 QQ
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Shanghai
+    steps:
+    - uses: actions/checkout@v5
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.12"
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    - name: Push hot board to QQ
+      run: python qq_hot_push.py
+      env:
+        QQ_APP_ID: ${{ secrets.QQ_APP_ID }}
+        QQ_APP_SECRET: ${{ secrets.QQ_APP_SECRET }}
+        QQ_GROUP_OPENID: ${{ secrets.QQ_GROUP_OPENID }}
+        HOT_JSON_URL: https://damon-97.github.io/last30days-skill-cn/hot.json
+        HOT_PAGE_URL: https://damon-97.github.io/last30days-skill-cn/
