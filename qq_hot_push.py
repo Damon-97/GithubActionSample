@@ -30,27 +30,52 @@ def fetch_hot(url):
     raise RuntimeError("读取热榜失败: {}".format(last_error))
 
 
-def clip(text, limit=60):
+def clip(text, limit=72):
     text = " ".join((text or "").split())
     if len(text) <= limit:
         return text
     return text[: limit - 1] + "…"
 
 
-def build_message(data, page_url):
-    lines = ["全网热榜", str(data.get("generated_at") or "").strip()]
+def short_label(label):
+    label = (label or "").strip()
+    for suffix in ("热搜", "热榜"):
+        if label.endswith(suffix) and len(label) > len(suffix):
+            return label[: -len(suffix)]
+    return label
+
+
+def entry_block(index, title, url, note=""):
+    lines = ["{}. {}".format(index, clip(title))]
+    if note:
+        lines.append(note)
+    if url:
+        lines.append(url.strip())
+    return "\n".join(lines)
+
+
+def section_block(title, body):
+    return "▸ {}\n{}".format(title, body)
+
+
+def build_sections(data, page_url):
+    sections = []
+    header = ["全网热榜", str(data.get("generated_at") or "").strip() or "刚刚更新"]
     if page_url:
-        lines.append(page_url)
+        header.extend(["", "完整看板", page_url.strip()])
+    sections.append("\n".join(header))
+
     topics = data.get("topics") or []
-    if topics:
-        lines.extend(["", "跨平台"])
-        for idx, topic in enumerate(topics[:8], start=1):
-            where = "、".join(
-                "{}#{}".format(m.get("label") or m.get("platform") or "", m.get("rank") or "-")
-                for m in (topic.get("mentions") or [])[:4]
-            )
-            suffix = "（{}）".format(where) if where else ""
-            lines.append("{}. {}{}".format(idx, clip(topic.get("title")), suffix))
+    topic_blocks = []
+    for idx, topic in enumerate(topics[:6], start=1):
+        where = " · ".join(
+            "{} #{}".format(short_label(m.get("label") or m.get("platform") or ""), m.get("rank") or "-")
+            for m in (topic.get("mentions") or [])[:4]
+        )
+        topic_blocks.append(entry_block(idx, topic.get("title"), topic.get("url"), where))
+    if topic_blocks:
+        sections.append(section_block("跨平台", "\n\n".join(topic_blocks)))
+
     shown = 0
     for sid, board in (data.get("boards") or {}).items():
         if board.get("kind") != "board" or sid == "hackernews":
@@ -58,30 +83,66 @@ def build_message(data, page_url):
         items = board.get("items") or []
         if not items:
             continue
-        lines.extend(["", board.get("label") or sid])
-        for item in items[:3]:
-            lines.append("{}. {}".format(item.get("rank") or "-", clip(item.get("title"), 50)))
+        blocks = [
+            entry_block(item.get("rank") or "-", item.get("title"), item.get("url"))
+            for item in items[:3]
+        ]
+        sections.append(section_block(board.get("label") or sid, "\n\n".join(blocks)))
         shown += 1
         if shown >= 6:
             break
-    return "\n".join(lines).strip()
+    return sections
 
 
-def chunks(text, limit=900):
+def build_message(data, page_url):
+    return "\n\n".join(build_sections(data, page_url)).strip()
+
+
+def _section_entries(section):
+    blocks = [block for block in section.split("\n\n") if block.strip()]
+    if not blocks:
+        return "", []
+    first = blocks[0]
+    if not first.startswith("▸ "):
+        return "", ["\n\n".join(blocks)]
+    heading, _, rest = first.partition("\n")
+    entries = ([rest] if rest else []) + blocks[1:]
+    return heading, entries
+
+
+def pack_sections(sections, limit=1400):
+    """按栏目打包。同一条消息里栏目标题只出现一次，拆到下一条时再带上。"""
     parts = []
-    current = []
-    size = 0
-    for line in text.splitlines():
-        extra = len(line) + 1
-        if current and size + extra > limit:
-            parts.append("\n".join(current))
-            current = [line]
-            size = len(line) + 1
+    current = ""
+
+    def append(piece):
+        nonlocal current
+        if not piece:
+            return
+        if current and len(current) + 2 + len(piece) > limit:
+            parts.append(current)
+            current = piece
+        elif current:
+            current = current + "\n\n" + piece
         else:
-            current.append(line)
-            size += extra
+            current = piece
+
+    for section in sections:
+        heading, entries = _section_entries(section)
+        if not heading:
+            append(section.strip())
+            continue
+        show_heading = True
+        for entry in entries:
+            piece = "{}\n{}".format(heading, entry) if show_heading else entry
+            if current and len(current) + 2 + len(piece) > limit:
+                parts.append(current)
+                current = "{}\n{}".format(heading, entry)
+            else:
+                append(piece)
+            show_heading = False
     if current:
-        parts.append("\n".join(current))
+        parts.append(current)
     return parts
 
 
@@ -91,11 +152,12 @@ def push_hot():
     url = os.environ.get("HOT_JSON_URL", "").strip() or DEFAULT_JSON_URL
     page = os.environ.get("HOT_PAGE_URL", "").strip() or DEFAULT_PAGE_URL
     data = fetch_hot(url)
-    content = build_message(data, page)
+    sections = build_sections(data, page)
+    content = "\n\n".join(sections)
     print(content)
     token = qq.get_qq_token(qq.require_qq_env("QQ_APP_ID"), qq.require_qq_env("QQ_APP_SECRET"))
     group = qq.require_qq_env("QQ_GROUP_OPENID")
-    parts = chunks(content)
+    parts = pack_sections(sections)
     for idx, part in enumerate(parts, start=1):
         body = "({}/{})\n{}".format(idx, len(parts), part) if len(parts) > 1 else part
         qq.send_group_message(token, group, body)
