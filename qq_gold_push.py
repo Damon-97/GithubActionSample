@@ -1,11 +1,14 @@
 import argparse
 import asyncio
+import base64
 import json
 import os
 
 import requests
 
 import gold_price_report as gold
+import gold_series
+import pc_price_report as price_fmt
 
 
 def require_qq_env(name):
@@ -27,11 +30,43 @@ def get_qq_token(app_id, app_secret):
     return token
 
 
-def build_message(shuibei_price, international_price):
-    today = gold.datetime.date.today().strftime("%Y年%m月%d日")
-    return "金价情况\n{}\n水贝金价 {} 元/克\n国际金价 {} 元/克".format(
-        today, shuibei_price, international_price
+def move_text(start_price, end_price):
+    delta = end_price - start_price
+    if not start_price:
+        return "无对比"
+    pct = delta / start_price * 100
+    sign = "+" if delta > 0 else ""
+    return "{}{} 元（{}{:.1f}%）".format(
+        sign, price_fmt.format_price(delta), sign, pct
     )
+
+
+def build_message(shuibei_price, international_price, daily, hourly):
+    today = gold.datetime.date.today().strftime("%Y年%m月%d日")
+    first_day, last_day = daily[0], daily[-1]
+    first_hour, last_hour = hourly[0], hourly[-1]
+    return "\n".join([
+        "金价情况",
+        today,
+        "水贝金价 {} 元/克".format(shuibei_price),
+        "国际金价 {} 元/克".format(international_price),
+        "",
+        "近2周（伦敦金交易日收盘，元/克）",
+        "{}  {}".format(last_day["date"], price_fmt.format_price(last_day["price_cny_per_gram"])),
+        "较 {} 的 {}，变动 {}".format(
+            first_day["date"],
+            price_fmt.format_price(first_day["price_cny_per_gram"]),
+            move_text(first_day["price_cny_per_gram"], last_day["price_cny_per_gram"]),
+        ),
+        "",
+        "近一天（每小时，元/克）",
+        "{}  {}".format(last_hour[0].strftime("%m-%d %H:%M"), price_fmt.format_price(last_hour[1])),
+        "较 {} 的 {}，变动 {}".format(
+            first_hour[0].strftime("%m-%d %H:%M"),
+            price_fmt.format_price(first_hour[1]),
+            move_text(first_hour[1], last_hour[1]),
+        ),
+    ])
 
 
 def send_group_message(token, group_openid, content):
@@ -61,17 +96,69 @@ def send_group_message(token, group_openid, content):
         print("qq message id: ok")
 
 
+def upload_group_image(token, group_openid, png_path):
+    with open(png_path, "rb") as handle:
+        encoded = base64.b64encode(handle.read()).decode("ascii")
+    response = requests.post(
+        "https://api.bot.qq.com/v2/groups/{}/files".format(group_openid),
+        headers={
+            "Authorization": "QQBot {}".format(token),
+            "Content-Type": "application/json",
+        },
+        json={
+            "file_type": 1,
+            "file_name": os.path.basename(png_path),
+            "file_data": encoded,
+            "srv_send_msg": False,
+        },
+        timeout=60,
+    )
+    try:
+        body = response.json()
+    except ValueError:
+        body = {}
+    print("qq image status={} message={}".format(response.status_code, body.get("message", "")))
+    if response.status_code >= 400 or not body.get("file_info"):
+        raise RuntimeError("QQ 图片上传失败")
+    return body["file_info"]
+
+
+def send_group_image(token, group_openid, file_info):
+    response = requests.post(
+        "https://api.bot.qq.com/v2/groups/{}/messages".format(group_openid),
+        headers={
+            "Authorization": "QQBot {}".format(token),
+            "Content-Type": "application/json",
+        },
+        json={"msg_type": 7, "media": {"file_info": file_info}},
+        timeout=30,
+    )
+    try:
+        body = response.json()
+    except ValueError:
+        body = {}
+    print("qq image send status={} message={}".format(response.status_code, body.get("message", "")))
+    if response.status_code >= 400:
+        raise RuntimeError("QQ 图片消息发送失败")
+
+
 def push_gold_price():
     app_id = require_qq_env("QQ_APP_ID")
     app_secret = require_qq_env("QQ_APP_SECRET")
     group_openid = require_qq_env("QQ_GROUP_OPENID")
-    page = gold.fetch_page()
-    shuibei_price = gold.get_shuibei_price(page)
-    international_price = gold.get_international_price(page)
-    content = build_message(shuibei_price, international_price)
+    snapshot = gold_series.refresh()
+    content = build_message(
+        snapshot["shuibei"],
+        snapshot["international"],
+        snapshot["daily"],
+        snapshot["hourly"],
+    )
     print(content)
     token = get_qq_token(app_id, app_secret)
     send_group_message(token, group_openid, content)
+    for path in snapshot["charts"]:
+        file_info = upload_group_image(token, group_openid, path)
+        send_group_image(token, group_openid, file_info)
 
 
 def credentials_ready():
