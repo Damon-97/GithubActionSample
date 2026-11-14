@@ -1037,6 +1037,10 @@
     {
       "time": "2026-11-14T10:20:00+08:00",
       "price_cny_per_gram": 836.6
+    },
+    {
+      "time": "2026-11-14T10:25:00+08:00",
+      "price_cny_per_gram": 836.6
     }
   ],
   "last_feishu_date": null,
